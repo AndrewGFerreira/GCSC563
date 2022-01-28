@@ -173,6 +173,7 @@ pre code {
 <div id="TOC">
 <ul>
 <li><a href="#downloading-the-dataset">Downloading the dataset</a></li>
+<li><a href="#cleaning-and-transforming-the-data">Cleaning and transforming the data</a></li>
 </ul>
 </div>
 
@@ -186,7 +187,7 @@ pre code {
 con_in &lt;- file(&quot;~/review_dataset.json&quot;) 
 
 # It will create and open a new file to store the subset
-con_out &lt;- file(tmp &lt;- tempfile(), open = &quot;wb&quot;)
+con_out &lt;- file(tmp &lt;- tempfile(&quot;subset&quot;, fileext = &quot;.json&quot;), open = &quot;wb&quot;)
 
 # The stream_in function will split the file into pages with 5000 records 
 # (as indicated), and it will find records where there is at least one vote for 
@@ -210,6 +211,36 @@ tempdir()
 
 # Load the subset file into a data frame
 yelpReviews &lt;- stream_in(file(&quot;~/subset.json&quot;), pagesize = 10000)</code></pre>
+</div>
+<div id="cleaning-and-transforming-the-data" class="section level2">
+<h2>Cleaning and transforming the data</h2>
+<p>The original dataset is structered in a way that does not fit for the purpose of this project. That’s why we need to clean and transform some of it.</p>
+<pre class="r"><code>library(tidyverse) 
+
+# Create a subset to preserve the original dataset
+subset_yelpReviews &lt;- yelpReviews
+
+# Select only necessary columns
+dataset &lt;- short_yelpReviews %&gt;%
+  select(review_id, text, useful, funny, cool)
+
+# Transpose data and transform the &#39;category&#39; columns into factor
+dataset &lt;- gather(data = dataset, key=&quot;category&quot;, value=&quot;votes&quot;, useful, funny, cool)
+dataset$category &lt;- as.factor(dataset$category)
+
+# Partion the data by review_id, and rank votes for each review, where 3 is
+# the most voted category
+library(plyr) #to run ddply ()
+dataset_sorted &lt;- ddply(dataset,.(review_id),transform,order = rank(votes,ties.method = &quot;first&quot;))
+detach(&quot;package:plyr&quot;, unload = TRUE) #to avoid future conflicts with dplyr
+
+# Select only the most voted category
+dataset_sorted &lt;- dataset_sorted %&gt;%
+  filter(order == 3)
+
+# Select only necessary columns
+reviewsDataset &lt;- dataset_sorted %&gt;%
+  select(text, category)</code></pre>
 </div>
 
 
