@@ -22,7 +22,7 @@ library(dplyr)
 con_in <- file("~/review_dataset.json") 
 
 # It will create and open a new file to store the subset
-con_out <- file(tmp <- tempfile(), open = "wb")
+con_out <- file(tmp <- tempfile("subset", fileext = ".json"), open = "wb")
 
 # The stream_in function will split the file into pages with 5000 records 
 # (as indicated), and it will find records where there is at least one vote for 
@@ -48,4 +48,38 @@ tempdir()
 yelpReviews <- stream_in(file("~/subset.json"), pagesize = 10000)
 ```
 
+## Cleaning and transforming the data
+
+The original dataset is structered in a way that does not fit for the purpose
+of this project. That's why we need to clean and transform some of it. 
+
+```{r Cleaning and transforming the data, eval=FALSE}
+library(tidyverse) 
+
+# Create a subset to preserve the original dataset
+subset_yelpReviews <- yelpReviews
+
+# Select only necessary columns
+dataset <- short_yelpReviews %>%
+  select(review_id, text, useful, funny, cool)
+
+# Transpose data and transform the 'category' columns into factor
+dataset <- gather(data = dataset, key="category", value="votes", useful, funny, cool)
+dataset$category <- as.factor(dataset$category)
+
+# Partion the data by review_id, and rank votes for each review, where 3 is
+# the most voted category
+library(plyr) #to run ddply ()
+dataset_sorted <- ddply(dataset,.(review_id),transform,order = rank(votes,ties.method = "first"))
+detach("package:plyr", unload = TRUE) #to avoid future conflicts with dplyr
+
+# Select only the most voted category
+dataset_sorted <- dataset_sorted %>%
+  filter(order == 3)
+
+# Select only necessary columns
+reviewsDataset <- dataset_sorted %>%
+  select(text, category)
+
+```
 
