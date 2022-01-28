@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.1.19)  21 JAN 2022 14:09
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.1.19)  27 JAN 2022 20:01
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -960,6 +960,13 @@ Overfull \hbox (27.18845pt too wide) has occurred while \output is active
 [2
 
 ]
+Overfull \hbox (27.18845pt too wide) has occurred while \output is active
+ [][][][]  
+ []
+
+[3
+
+]
 \tf@nav=\write6
 \openout6 = `Ferreira-VanDusen.nav'.
 
@@ -974,23 +981,20 @@ Package rerunfilecheck Info: File `Ferreira-VanDusen.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 20448 strings out of 478994
- 381063 string characters out of 5858184
- 666029 words of memory out of 5000000
- 37503 multiletter control sequences out of 15000+600000
+ 20527 strings out of 478994
+ 383645 string characters out of 5858184
+ 678819 words of memory out of 5000000
+ 37581 multiletter control sequences out of 15000+600000
  405242 words of font info for 33 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  131i,15n,132p,443b,562s stack positions out of 5000i,500n,10000p,200000b,80000s
-pdfTeX warning (dest): name{Navigation3} has been referenced but does not exi
-st, replaced by a fixed one
-
-</usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmss10.pfb><
-/usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmss12.pfb></
-usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmss8.pfb>
-Output written on Ferreira-VanDusen.pdf (2 pages, 39397 bytes).
+</usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmss10.pfb
+></usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmss12.pfb>
+</usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmss8.pfb>
+Output written on Ferreira-VanDusen.pdf (3 pages, 52751 bytes).
 PDF statistics:
- 96 PDF objects out of 1000 (max. 8388607)
- 75 compressed objects within 1 object stream
- 6 named destinations out of 1000 (max. 500000)
- 79 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 183 PDF objects out of 1000 (max. 8388607)
+ 130 compressed objects within 2 object streams
+ 7 named destinations out of 1000 (max. 500000)
+ 259 words of extra memory for PDF output out of 10000 (max. 10000000)
 
