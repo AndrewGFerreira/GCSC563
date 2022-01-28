@@ -9,5 +9,43 @@ output:
     toc: yes
 ---
 
-## Introduction
+## Downloading the dataset
+Feel free tp [download](https://www.yelp.com/dataset/documentation/main) the dataset from yelp. 
+It is a zip file with many datasets, including the review dataset, a 6GB json file.
+
+This file is too large for many laptops to handle. The code below helps to extract a subset to move foward on this project.
+
+```{r Extracting subset, eval=FALSE}
+library(dplyr) 
+
+# It opens the json file
+con_in <- file("~/review_dataset.json") 
+
+# It will create and open a new file to store the subset
+con_out <- file(tmp <- tempfile(), open = "wb")
+
+# The stream_in function will split the file into pages with 5000 records 
+# (as indicated), and it will find records where there is at least one vote for 
+# 'useful', 'funny' or 'cool' and it will store those records in the new file.
+stream_in(con_in, handler = function(df)
+  {
+    df <- dplyr::filter(df, useful > 0 | funny > 0 | cool > 0)
+    stream_out(df, con_out, pagesize = 5000)
+  }, pagesize = 5000)
+
+# The code above will run until the end of the primary file, or until you 
+# manually stop it. For the puporse of this project, I stopped the code when 
+# it reached 2MM records. The code below will save and close the temporary file. 
+# Without this step, the temporary file will remain opened and without any 
+# records.
+close(con_out)
+
+# The code below will give you the directory of the new file, so you can rename 
+# it (like subset.json) and use it later.
+tempdir()
+
+# Load the subset file into a data frame
+yelpReviews <- stream_in(file("~/subset.json"), pagesize = 10000)
+```
+
 
