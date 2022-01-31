@@ -83,3 +83,165 @@ reviewsDataset <- dataset_sorted %>%
 
 ```
 
+## Exploratory Data Analysis (EDA)
+
+The "bag-of-words" model will try to use the word frequency to determine a category of text, while the n-gram will try to determine the category by analyzing a group of n words in a text.
+
+Here is how the book describes:
+
+> _the word "quarter" might be very frequent in both the business and sports category, but the four-word sequence "first quarter earnings report" is only common in business while "fourth quarter touchdown passes" in sports._ (Chapter 23 - Natural Language Processing)
+
+Our objective during the EDA is to find out is to determine what model might be a better fit for text categorization.
+
+OBS:After both steps above, a .csv file was created, but the file is too large (755MB) via R markdown. 
+Please,  [click here to download](https://www.dropbox.com/s/r0ckgo9v21b5wp5/yelp_dataset%20dataset.csv?dl=0) the file and run this analysis. 
+
+```{r Load file}
+library(dplyr)
+
+# Initialize dataset (paste the path to the file in your computer)
+data <- read.csv("/Users/andrew.ferreira/Dropbox (Life.Church)/Mac/Downloads/yelp_dataset/yelp_dataset dataset.csv")
+# uncomment if you want to run a sample data <- sample_n(data, 15000)
+
+#Select only the necessary columns
+dataset <- data %>%
+  select(text, category)
+dataset$category <- as.factor(dataset$category)
+```
+
+The process of dividing a text into a sequence of words (either 1 or n) is called tokenization.
+The code below will split the texts into words, and count the frequency of each of them.
+
+```{r tokenization n1}
+library(tidytext)
+
+# Separate and count the frequency each word
+datasetWords <- dataset %>%
+  unnest_tokens(word, text) %>%
+  count(category, word, sort = TRUE)
+
+# Count the number of words in each category
+datasetTotalWords <- datasetWords %>%
+  group_by(category) %>%
+  summarize(total = sum(n))
+
+# Show the number of times each word appears in each category in contrast 
+# with the amount of words in that category
+categoryWords <- left_join(datasetWords, datasetTotalWords)
+head(categoryWords, 20)
+
+```
+At this point we can see, just by looking at the top 20, that vague words like "the," "and," "for," are very common.
+Let's take a look at the word frequency distribution in each category
+
+```{r word frequency distribution}
+library(ggplot2)
+
+ggplot(categoryWords, aes(n/total, fill = category)) +
+  geom_histogram(show.legend = FALSE) +
+  xlim(NA, 0.0009) +
+  facet_wrap(~category, ncol = 2, scales = "free_y")
+```
+
+It seems like the frequency of those vague and common words are ridiculously high skewing our data. Another possible explanation to this chart is some very rare words at the end.
+
+Let's rank the appearance of each word in each category where the most frequent word is the number 1.
+
+```{r Ranking each word}
+# Rank each word based on frequency
+freq_by_rank <- categoryWords %>% 
+  group_by(category) %>% 
+  mutate(rank = row_number(), 
+         `term frequency` = n/total) %>%
+  ungroup()
+
+# Show top 20
+head(freq_by_rank, 20)
+
+# Rank x term Frequency
+freq_by_rank %>% 
+  ggplot(aes(rank, `term frequency`, color = category)) + 
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) 
+
+# Rank x term Frequency (log-log coordinates)
+freq_by_rank %>% 
+  ggplot(aes(rank, `term frequency`, color = category)) + 
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+The chart above is a very import chart, because we can clearly see that the frequency of words are very similar in the three categories (cool, funny, and useful). This is a strong indicator that the "bag-of-words" might not be a good fit for us. 
+
+However, at the end of each line we can see a distinction. Maybe the frequency of some rare words in each category might be strong enough to predict the category. 
+
+Let's create linear model based on word frequency, just to confirm what we discovered so far.
+
+```{r Linear model word frequency}
+# Let's filter by rank, eliminating the top 10 words (the, of, and, etc.) and 
+# including up to 5000
+rank_subset <- freq_by_rank %>% 
+  filter(rank < 5000,
+         rank > 10)
+
+lm(log10(`term frequency`) ~ log10(rank), data = rank_subset)
+# Outcome: Intercept: -0.1981 Slope: -1.2771 
+
+# I manually copy and past the intercept and slope
+freq_by_rank %>% 
+  ggplot(aes(rank, `term frequency`, color = category)) + 
+  geom_abline(intercept = -0.1981, slope = -1.2771, 
+              color = "gray50", linetype = 2) +
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+As we can see, the frequency of a word in our dataset does not seem to fit very well the linear model. 
+
+There is a function in the tidytext package that will help us to decrease the weight of super common words, and increase the weight of words that are not super frequent. 
+
+Julia Silge and David Robinson will say
+
+> Calculating tf-idf attempts to find the words that are important (i.e., common) in a text, but not too common. (Source: Text Mining with R)
+
+```{r Calculating tf idf}
+# Call function for each category
+category_tf_idf <- categoryWords %>%
+  bind_tf_idf(word, category, n)
+
+# Print top 20
+head(category_tf_idf, 20)
+# We can see that the tf_idf for vague and common words are very close to 0, 
+# and the idf for them is 0 because those words appears in the three categories 
+# we are looking at
+
+# We can arrange the table to show the words that are more specific and frequent 
+# in each category
+category_tf_idf <- category_tf_idf %>%
+  select(-total) %>%
+  arrange(desc(tf_idf))
+
+head(category_tf_idf, 20)
+
+
+# Let's look the top 20
+library(forcats)
+
+category_tf_idf %>%
+  group_by(category) %>%
+  slice_max(tf_idf, n = 20) %>%
+  ungroup() %>%
+  ggplot(aes(tf_idf, fct_reorder(word, tf_idf), fill = category)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~category, ncol = 2, scales = "free") +
+  labs(x = "tf-idf", y = NULL)
+```
+
+
+The charts above is showing us the 20 most strong words of each category. 
+While words like 'daycares' or 'recruiters' kind of make sense for useful reviews, it is hard to find a "funny" or "cool"
+word in the top 20. Maybe now it is a good time to start looking at a group of words, or n-gram.
+
+
+
