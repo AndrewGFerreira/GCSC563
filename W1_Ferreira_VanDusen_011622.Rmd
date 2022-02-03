@@ -10,13 +10,23 @@ output:
 ---
 
 ## Downloading the dataset
-Feel free tp [download](https://www.yelp.com/dataset/documentation/main) the dataset from yelp. 
+Feel free to [download](https://www.yelp.com/dataset/documentation/main) the dataset from yelp. 
 It is a zip file with many datasets, including the review dataset, a 6GB json file.
 
 This file is too large for many laptops to handle. The code below helps to extract a subset to move foward on this project.
 
+```{r Install library, include=FALSE}
+library(dplyr)
+library(tidyverse) 
+library(tidytext)
+library(ggplot2)
+library(forcats)
+library(igraph)
+library(ggraph)
+```
+
+
 ```{r Extracting subset, eval=FALSE}
-library(dplyr) 
 
 # It opens the json file
 con_in <- file("~/review_dataset.json") 
@@ -46,15 +56,17 @@ tempdir()
 
 # Load the subset file into a data frame
 yelpReviews <- stream_in(file("~/subset.json"), pagesize = 10000)
+
+
 ```
 
+![review.json](/Users/andrew.ferreira/Library/Mobile Documents/com~apple~CloudDocs/Documents/ORAL ROBERTS UNIVERSITY/MSCS/Artificial Intelligence/Project/GroupProject/GCSC563/Screen Shot 2022-02-02 at 7.55.37 PM.png)
 ## Cleaning and transforming the data
 
 The original dataset is structered in a way that does not fit for the purpose
 of this project. That's why we need to clean and transform some of it. 
 
 ```{r Cleaning and transforming the data, eval=FALSE}
-library(tidyverse) 
 
 # Create a subset to preserve the original dataset
 subset_yelpReviews <- yelpReviews
@@ -83,7 +95,7 @@ reviewsDataset <- dataset_sorted %>%
 
 ```
 
-## Exploratory Data Analysis (EDA)
+## Exploratory Data Analysis (EDA) - Part one: unigram
 
 The "bag-of-words" model will try to use the word frequency to determine a category of text, while the n-gram will try to determine the category by analyzing a group of n words in a text.
 
@@ -97,7 +109,6 @@ OBS:After both steps above, a .csv file was created, but the file is too large (
 Please,  [click here to download](https://www.dropbox.com/s/r0ckgo9v21b5wp5/yelp_dataset%20dataset.csv?dl=0) the file and run this analysis. 
 
 ```{r Load file}
-library(dplyr)
 
 # Initialize dataset (paste the path to the file in your computer)
 data <- read.csv("/Users/andrew.ferreira/Dropbox (Life.Church)/Mac/Downloads/yelp_dataset/yelp_dataset dataset.csv")
@@ -106,14 +117,16 @@ data <- read.csv("/Users/andrew.ferreira/Dropbox (Life.Church)/Mac/Downloads/yel
 #Select only the necessary columns
 dataset <- data %>%
   select(text, category)
+
 dataset$category <- as.factor(dataset$category)
+
+head(dataset,10)
 ```
 
 The process of dividing a text into a sequence of words (either 1 or n) is called tokenization.
 The code below will split the texts into words, and count the frequency of each of them.
 
 ```{r tokenization n1}
-library(tidytext)
 
 # Separate and count the frequency each word
 datasetWords <- dataset %>%
@@ -135,7 +148,6 @@ At this point we can see, just by looking at the top 20, that vague words like "
 Let's take a look at the word frequency distribution in each category
 
 ```{r word frequency distribution}
-library(ggplot2)
 
 ggplot(categoryWords, aes(n/total, fill = category)) +
   geom_histogram(show.legend = FALSE) +
@@ -222,13 +234,8 @@ category_tf_idf <- category_tf_idf %>%
   select(-total) %>%
   arrange(desc(tf_idf))
 
-head(category_tf_idf, 20)
-
-
 # Let's look the top 20
-library(forcats)
-
-category_tf_idf %>%
+unigram_tf_idf <- category_tf_idf %>%
   group_by(category) %>%
   slice_max(tf_idf, n = 20) %>%
   ungroup() %>%
@@ -236,6 +243,9 @@ category_tf_idf %>%
   geom_col(show.legend = FALSE) +
   facet_wrap(~category, ncol = 2, scales = "free") +
   labs(x = "tf-idf", y = NULL)
+
+head(category_tf_idf, 20)
+unigram_tf_idf
 ```
 
 
@@ -243,5 +253,210 @@ The charts above is showing us the 20 most strong words of each category.
 While words like 'daycares' or 'recruiters' kind of make sense for useful reviews, it is hard to find a "funny" or "cool"
 word in the top 20. Maybe now it is a good time to start looking at a group of words, or n-gram.
 
+## Exploratory Data Analysis (EDA) - Part two: bigram and trigram
+
+Let's see if capturing the interaction between two (bigram) and three (trigram) brings more meaning to those top words.
+It might still be vague because of the size of our dataset, but this might help us decide between the bag-of-words model and the ngram model.
+If the EDA do not answer our question, we might jump straight to modeling the data and analysing accuracy or we can try smoothing the n-gram.
+
+```{r Prepare ngram dataset}
+set.seed(2022)
+
+# Getting a sample to calculate tri and bi grams
+dataset_bi_sample <- sample_frac(dataset, .10)
+dataset_tri_sample <- sample_frac(dataset, .10)  
+
+# preparing bigram dataset
+dataset_bi_sample <-  dataset_bi_sample %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+
+dataset_bi_count <- dataset_bi_sample %>%
+  count(bigram, sort = TRUE)
+
+# preparing trigram dataset
+dataset_tri_sample <-  dataset_tri_sample %>%
+  unnest_tokens(trigram, text, token = "ngrams", n = 3)
+
+dataset_tri_count <- dataset_tri_sample %>%
+  count(trigram, sort = TRUE)
+
+# print results
+head(dataset_bi_sample, 10)
+head(dataset_bi_count, 10)
+
+head(dataset_tri_count, 10)
+head(dataset_tri_sample, 10)
+```
+
+The trigram is too large to compute and bigram was taking too long, so I had to create a sample dataset of only 10% of the original dataset and 10% for the bigram. With both datasets we can see that by looking ngram, the top 20 is more meaningful. 
+
+Still, authors might disagree on the next step at this point. For an EDA perspective, it might be helpful to split the words from the bi and tri grams and create a list of 'stop-words' (words super common such as 'the', 'of') and remove those words from the ngrams. By doing this, we might reduce the sckew of our histogram, and get a better distribution. But from ML perspective, we don't want to hard code anything, since the very nature of ML is to avoid hard-coding the model.
+
+Still, both points-of-view agree that removing some 'insignificant' words might be helpful. 
+While EDA authors recommend hard code a list of stop-words, ML author recomend setting a frequency threshold (exclude words with frequency less than < 0.0001%)
+
+```{r Separating the words}
+set.seed(2022)
+
+# Reducing the dataset
+dataset_bi_sample_separated <- sample_frac(dataset_bi_sample, .10)
+dataset_tri_sample_separated <- sample_frac(dataset_tri_sample, .10)  
+
+# separating thr words
+bigram_separated <- dataset_bi_sample_separated %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+trigram_separated <- dataset_tri_sample_separated %>%
+  separate(trigram, c("word1", "word2", "word3"), sep = " ")
+
+# shows results
+head(bigram_separated, 10)
+head(trigram_separated, 10)
+
+```
+
+Now that the words are separated, we can try to remove the 'stop-words', which R in fact already have the list for us
+
+```{r Remove stop-words}
+
+# remove stop-words
+bigrams_filtered <- bigram_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+  
+trigrams_filtered <- trigram_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!word3 %in% stop_words$word)
+
+# sort the table
+bigram_counts_separated <- bigrams_filtered %>% 
+  count(word1, word2, sort = TRUE)
+
+trigram_counts_separated <- trigrams_filtered %>% 
+  count(word1, word2, word3, sort = TRUE)
+
+#show results
+head(bigram_counts_separated,10)
+head(trigram_counts_separated,10)
+```
+
+This gives us a very nice result. Before removing the stop-words, the top 10 bigram was 'of the' or 'it was',and the trigram was 'and i had' or 'ago and i'
+but after removing the stop word, we got 'customer service' or 'highly recommend' for bigram and 'poor customer service' or 'gluten free options' for trigram.
+
+```{r Unite filtered data}
+
+# unite words again
+bigrams_united <- bigrams_filtered %>%
+  unite(bigram, word1, word2, sep = " ")
+
+trigrams_united <- trigrams_filtered %>%
+  unite(trigram, word1, word2, word3, sep = " ")
+
+# show results
+head(bigrams_united, 10)
+head(trigrams_united, 10)
+
+```
+
+We can also apply the tf_idf analysis to find out what ngrams are more specific for each category
+
+```{r tf_idf for ngrams}
+
+# Calculate tf_idf
+bigram_tf_idf <- bigrams_united %>%
+  count(category, bigram) %>%
+  bind_tf_idf(bigram, category, n) %>%
+  arrange(desc(tf_idf))
+
+trigram_tf_idf <- trigrams_united %>%
+  count(category, trigram) %>%
+  bind_tf_idf(trigram, category, n) %>%
+  arrange(desc(tf_idf))
+
+# Represent graphically
+bigram_tf_idf_chart <- bigram_tf_idf %>%
+  group_by(category) %>%
+  slice_max(tf_idf, n = 8) %>%
+  ungroup() %>%
+  ggplot(aes(tf_idf, fct_reorder(bigram, tf_idf), fill = category)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~category, ncol = 2, scales = "free") +
+  labs(x = "tf-idf", y = NULL)
+
+trigram_tf_idf_chart <- trigram_tf_idf %>%
+  group_by(category) %>%
+  slice_max(tf_idf, n = 5) %>%
+  ungroup() %>%
+  ggplot(aes(tf_idf, fct_reorder(trigram, tf_idf), fill = category)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~category, ncol = 2, scales = "free") +
+  labs(x = "tf-idf", y = NULL)
+
+# Show results
+head(bigram_tf_idf, 10)
+bigram_tf_idf_chart
+head(trigram_tf_idf, 10)
+trigram_tf_idf_chart
+```
+The final result is not great, but it is better than the bag-of-words analysis. using the ngram we can see more meaningful results, but it increases the computation.
+
+```{r Analysing nodes}
+# represent them graphically
+bigram_graph <- bigram_counts_separated %>%
+  filter(n > 40) %>%
+  graph_from_data_frame()
+
+trigram_graph <- trigram_counts_separated %>%
+  filter(n > 5) %>%
+  graph_from_data_frame()
+
+bigram_graph_nodes <- ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+
+trigram_graph_nodes <- ggraph(trigram_graph, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point() +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+
+bigram_graph_nodes
+trigram_graph_nodes
+```
 
 
+The chart above helps us to visualize words with multiple connections. For example 'customer' is a key word with many ramifications, and numbers such as '1' can also lead to multiple branches. 
+
+```{r Analysing nodes with direction}
+
+a <- grid::arrow(type = "closed", length = unit(.08, "inches"))
+
+bigram_graph_direction <- ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+
+trigram_graph_direction <- ggraph(trigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+
+bigram_graph_direction
+trigram_graph_direction
+```
+
+
+Now can see the direction of the words and understand their relationship
+
+next steps:
+ 1. Verify if we can and if we need to filter companies only in the US
+ 2. Maybe expand the samples to more than 10%
+ 3. Consider smoothing the ngram (in the book)
+ 4. play with numbers on the bigram_graph_direction and trigram_graph_direction to find a better representation
+ 
+So far, I would say to pick bigram because it is more meaningful than bag-of-words and not too large to compute as the trigram
