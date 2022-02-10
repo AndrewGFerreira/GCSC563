@@ -23,13 +23,14 @@ library(ggplot2)
 library(forcats)
 library(igraph)
 library(ggraph)
+library(jsonlite)
 ```
 
 
 ```{r Extracting subset, eval=FALSE}
 
 # It opens the json file
-con_in <- file("~/review_dataset.json") 
+con_in <- file("~review_dataset.json") 
 
 # It will create and open a new file to store the subset
 con_out <- file(tmp <- tempfile("subset", fileext = ".json"), open = "wb")
@@ -55,8 +56,7 @@ close(con_out)
 tempdir()
 
 # Load the subset file into a data frame
-yelpReviews <- stream_in(file("~/subset.json"), pagesize = 10000)
-
+yelpReviews <- stream_in(file("~subset.json"), pagesize = 10000)
 
 ```
 
@@ -72,7 +72,7 @@ of this project. That's why we need to clean and transform some of it.
 subset_yelpReviews <- yelpReviews
 
 # Select only necessary columns
-dataset <- short_yelpReviews %>%
+dataset <- subset_yelpReviews %>%
   select(review_id, text, useful, funny, cool)
 
 # Transpose data and transform the 'category' columns into factor
@@ -111,7 +111,7 @@ Please,  [click here to download](https://www.dropbox.com/s/r0ckgo9v21b5wp5/yelp
 ```{r Load file}
 
 # Initialize dataset (paste the path to the file in your computer)
-data <- read.csv("/Users/andrew.ferreira/Dropbox (Life.Church)/Mac/Downloads/yelp_dataset/yelp_dataset dataset.csv")
+data <- read.csv("/Users/andrew.ferreira/Dropbox (Life.Church)/Mac/Downloads/yelp_dataset/yelp_dataset_dataset.csv")
 # uncomment if you want to run a sample data <- sample_n(data, 15000)
 
 #Select only the necessary columns
@@ -132,6 +132,7 @@ The code below will split the texts into words, and count the frequency of each 
 datasetWords <- dataset %>%
   unnest_tokens(word, text) %>%
   count(category, word, sort = TRUE)
+
 
 # Count the number of words in each category
 datasetTotalWords <- datasetWords %>%
@@ -460,3 +461,59 @@ next steps:
  4. play with numbers on the bigram_graph_direction and trigram_graph_direction to find a better representation
  
 So far, I would say to pick bigram because it is more meaningful than bag-of-words and not too large to compute as the trigram
+
+# Preparing dataset for modeling
+
+```{r}
+# list of selected bigram
+summary(bigram_tf_idf)
+quantile(bigram_tf_idf$tf_idf, 0.25)
+quantile(bigram_tf_idf$tf_idf, 0.75)
+
+selected_bigram_tf_idf <- bigram_tf_idf %>%
+  filter(
+    tf_idf >= quantile(bigram_tf_idf$tf_idf, 0.25) 
+    & tf_idf <= quantile(bigram_tf_idf$tf_idf, 0.75)
+    ) %>%
+  select(bigram)
+
+library(tm)
+
+mini_dataset <- sample_frac(dataset, .0001)
+
+head(mini_dataset, 10)
+
+mini_dataset <- mini_dataset %>%
+  mutate(id = row_number())
+
+
+mini_dataset_ngram <- mini_dataset %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>%
+  unite(bigram, word1, word2, sep = " ") %>%
+  filter(bigram %in% bigram_tf_idf$bigram)
+
+mini_dataset_ngram_count <- mini_dataset_ngram %>%
+  group_by(id) %>%
+  count(bigram, sort = TRUE)
+
+
+m <- mini_dataset_ngram_count %>%
+  cast_sparse(row = id, bigram, n)
+
+dtm_df <- data.frame(as.matrix(m)) 
+
+dtm_df <- dtm_df %>%
+  mutate(id = row.names(dtm_df))
+
+dtm_df$id <- as.integer(dtm_df$id)
+
+dtm_df <- dtm_df %>%
+  left_join(mini_dataset)
+
+dtm_df %>%
+  select(id, category)
+```
+
