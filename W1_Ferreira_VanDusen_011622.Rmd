@@ -24,6 +24,9 @@ library(forcats)
 library(igraph)
 library(ggraph)
 library(jsonlite)
+library(tm)
+library(parsnip) 
+library(tidymodels)
 ```
 
 
@@ -254,7 +257,7 @@ The charts above is showing us the 20 most strong words of each category.
 While words like 'daycares' or 'recruiters' kind of make sense for useful reviews, it is hard to find a "funny" or "cool"
 word in the top 20. Maybe now it is a good time to start looking at a group of words, or n-gram.
 
-## Exploratory Data Analysis (EDA) - Part two: bigram and trigram
+# Exploratory Data Analysis (EDA) - Part two: bigram and trigram
 
 Let's see if capturing the interaction between two (bigram) and three (trigram) brings more meaning to those top words.
 It might still be vague because of the size of our dataset, but this might help us decide between the bag-of-words model and the ngram model.
@@ -464,7 +467,7 @@ So far, I would say to pick bigram because it is more meaningful than bag-of-wor
 
 # Preparing dataset for modeling
 
-```{r}
+```{r Getting the data for modeling}
 # list of selected bigram
 summary(bigram_tf_idf)
 quantile(bigram_tf_idf$tf_idf, 0.25)
@@ -477,11 +480,9 @@ selected_bigram_tf_idf <- bigram_tf_idf %>%
     ) %>%
   select(bigram)
 
-library(tm)
+mini_dataset <- sample_frac(dataset, 0.001)
 
-mini_dataset <- sample_frac(dataset, .0001)
-
-head(mini_dataset, 10)
+# head(mini_dataset, 10)
 
 mini_dataset <- mini_dataset %>%
   mutate(id = row_number())
@@ -513,7 +514,76 @@ dtm_df$id <- as.integer(dtm_df$id)
 dtm_df <- dtm_df %>%
   left_join(mini_dataset)
 
-dtm_df %>%
-  select(id, category)
+# Data transformation
+# before
+# head(mini_dataset_ngram_count, 3)
+# after
+# head(dtm_df, 3)
 ```
+
+# Modeling
+
+```{r Training and testing the model}
+dtm_df_for_model <- dtm_df %>%
+  select(-text) %>%
+  sample_frac(.10)
+
+dtm_df_split <- initial_split(dtm_df_for_model, 
+                                    prop = 0.75, 
+                                    strata = category)
+
+#training data
+dtm_df_training <- dtm_df_split %>%
+  training()
+
+#test data
+dtm_df_test <- dtm_df_split %>% 
+  testing()
+
+#Define the model specification with parsnip
+lm_dtm_df_def <- multinom_reg() %>% 
+  # Set the model engine
+  set_engine('nnet', MaxNWts = 20000) %>% 
+  # Set the model mode
+  set_mode('classification')
+
+#Train the model with training data
+lm_dtm_df <- lm_dtm_df_def %>% 
+  fit(category ~ ., 
+      data=dtm_df_training)
+
+#Review model
+dtm_Predictions <- predict(lm_dtm_df, new_data = dtm_df_test, type = 'class')
+dtm_Probabilities <- predict(lm_dtm_df, new_data = dtm_df_test, type = 'prob')
+
+#combining results
+dtmResults <- dtm_df_test %>%
+  select(id, category) %>%
+  bind_cols(dtm_Predictions, dtm_Probabilities)
+
+head(dtmResults, 10)
+```
+
+```{r Model results}
+conf_mat <- conf_mat(dtmResults, truth = category, estimate = .pred_class)
+
+
+conf_mat_mosaic <- conf_mat(dtmResults, truth = category, estimate = .pred_class) %>%
+  autoplot(type = 'mosaic')
+
+acc <- accuracy(dtmResults, truth = category, estimate = .pred_class)
+
+conf_mat
+conf_mat_mosaic
+acc
+
+# Save the model
+saveRDS(lm_dtm_df, "final_model.rds")
+```
+The overall accuracy is 52%, but keep the following in mind:
+
+- Due to computation cost we are only using a very small fraction of the dataset
+
+- We are considering the most voted category as the classification of a review. Cases where the votes were tied, we selected the first one thatshoed up. 
+
 
