@@ -1,0 +1,184 @@
+---
+title: "W1_Ferreira_VanDusen_02_16_2020"
+author: "Andrew Ferreira"
+date: "2/16/2022"
+output: html_document
+---
+
+## Installing libraries
+
+```{r Install library, include=FALSE}
+
+#install.packages(c("dplyr", "tidyverse", "tidytext", "ggplot2", "forcats", "igraph", 
+#                   "ggraph", "jsonlite", "tm", "parsnip", "tidymodels"))
+library(dplyr)
+library(tidytext)
+library(ggplot2)
+library(forcats)
+library(igraph)
+library(ggraph)
+library(jsonlite)
+library(parsnip) 
+library(tidymodels)
+library(tidyverse) 
+library(tm)
+```
+
+# Preparing bigram
+
+```{r Load file}
+
+# Initialize dataset (paste the path to the file in your computer)
+data <- read.csv("https://storage.googleapis.com/oru_projects/yelp_dataset_dataset.csv", header = TRUE)
+
+#Select only the necessary columns
+dataset <- data %>%
+  select(text, category)
+
+dataset$category <- as.factor(dataset$category)
+dataset$text <- as.character(dataset$text)
+```
+
+```{r Prepare ngram dataset}
+# Getting a sample to calculate tri and bi grams
+dataset_20p <- sample_frac(dataset, .20)
+
+# preparing bigram dataset
+dataset_20p_bi <-  dataset_20p %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+
+# separating the words
+dataset_20p_bi_separated <- dataset_20p_bi %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+# remove stop-words
+dataset_20p_bi_filtered <- dataset_20p_bi_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+
+dataset_20p_bi_filtered <- dataset_20p_bi_filtered %>%
+  unite(bigram, word1, word2, sep = " ")
+
+dataset_20p_bi_tf_idf <- dataset_20p_bi_filtered %>%
+  count(category, bigram) %>%
+  bind_tf_idf(bigram, category, n) %>%
+  arrange(desc(tf_idf))
+
+dataset_20p_bi_bigrams <- dataset_20p_bi_tf_idf %>%
+  filter(
+    tf_idf >= quantile(dataset_20p_bi_tf_idf$tf_idf, 0.25, na.rm = TRUE) 
+    & tf_idf <= quantile(dataset_20p_bi_tf_idf$tf_idf, 0.75, na.rm = TRUE)
+    ) %>%
+  select(bigram)
+
+dataset_20p_bi_bigrams_top_1K <- dataset_20p_bi_tf_idf %>%
+  filter(
+    tf_idf >= quantile(dataset_20p_bi_tf_idf$tf_idf, 0.25, na.rm = TRUE) 
+    & tf_idf <= quantile(dataset_20p_bi_tf_idf$tf_idf, 0.75, na.rm = TRUE)
+    ) %>%
+  top_n(1000, n) %>%
+  select(bigram)
+
+write.csv(dataset_20p_bi_bigrams_top_1K,"bigrams_top_1k.csv", row.names = FALSE)
+```
+
+# Preparing dataset for modeling
+
+```{r Getting the data for modeling}
+# UNK
+modeling_dataset_20p_bi_UNK <- modeling_dataset_20p %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>%
+  unite(bigram, word1, word2, sep = " ") %>%
+  mutate(finalBigram = if_else(
+    bigram %in% dataset_20p_bi_bigrams_top_1K$bigram, 
+    bigram, "<UNK>")
+    )
+
+modeling_dataset_20p_bi_count_UNK <- modeling_dataset_20p_bi_UNK %>%
+  group_by(id) %>%
+  count(finalBigram, sort = TRUE)
+
+modeling_dataset_20p_bi_m_UNK <- modeling_dataset_20p_bi_count_UNK %>%
+  cast_dtm(id, finalBigram, n)
+
+dtm_df_UNK <- data.frame(as.matrix(modeling_dataset_20p_bi_m_UNK)) 
+
+dtm_df_UNK <- dtm_df_UNK %>%
+  mutate(id = row.names(dtm_df_UNK))
+
+dtm_df_UNK$id <- as.integer(dtm_df_UNK$id)
+
+dtm_df_UNK <- dtm_df_UNK %>%
+  left_join(modeling_dataset_20p)
+```
+
+# Modeling
+
+```{r Training and testing the model}
+dtm_df_for_model <- dtm_df %>%
+  select(-text) %>%
+  sample_frac(1)
+
+dtm_df_for_model_UNK <- dtm_df_UNK %>%
+  select(-text) %>%
+  sample_frac(1)
+
+dtm_df_split <- initial_split(dtm_df_for_model_UNK, 
+                                    prop = 0.75, 
+                                    strata = category)
+
+#training data
+dtm_df_training <- dtm_df_split %>%
+  training()
+
+#test data
+dtm_df_test <- dtm_df_split %>% 
+  testing()
+
+#Define the model specification with parsnip
+lm_dtm_df_def <- multinom_reg() %>% 
+  # Set the model engine
+  set_engine('nnet', MaxNWts = 20000) %>% #, MaxNWts = 20000
+  # Set the model mode
+  set_mode('classification')
+
+#Train the model with training data
+lm_dtm_df <- lm_dtm_df_def %>% 
+  fit(category ~ ., 
+      data=dtm_df_training)
+
+#Review model
+dtm_Predictions <- predict(lm_dtm_df, new_data = dtm_df_test, type = 'class')
+dtm_Probabilities <- predict(lm_dtm_df, new_data = dtm_df_test, type = 'prob')
+
+#combining results
+dtmResults <- dtm_df_test %>%
+  select(id, category) %>%
+  bind_cols(dtm_Predictions, dtm_Probabilities)
+```
+
+```{r Model results}
+conf_mat <- conf_mat(dtmResults, truth = category, estimate = .pred_class)
+
+
+conf_mat_mosaic <- conf_mat(dtmResults, truth = category, estimate = .pred_class) %>%
+  autoplot(type = 'mosaic')
+
+acc <- accuracy(dtmResults, truth = category, estimate = .pred_class)
+
+conf_mat
+conf_mat_mosaic
+acc
+
+# Save the model
+saveRDS(lm_dtm_df, "final_model_UNK.rds")
+```
+The overall accuracy is 52%, but keep the following in mind:
+
+- Due to computation cost we are only using a very small fraction of the dataset
+
+- We are considering the most voted category as the classification of a review. Cases where the votes were tied, we selected the first one thatshoed up. 
+

@@ -1,6 +1,6 @@
 ---
-title: "W1_Ferreira_VanDusen_02_16_2020"
-author: "Andrew Ferreira"
+title: "TITAN_Text_Classification"
+author: "Andrew"
 date: "2/16/2022"
 output: html_document
 ---
@@ -9,8 +9,8 @@ output: html_document
 
 ```{r Install library, include=FALSE}
 
-#install.packages(c("dplyr", "tidyverse", "tidytext", "ggplot2", "forcats", "igraph", 
-#                   "ggraph", "jsonlite", "tm", "parsnip", "tidymodels"))
+install.packages(c("dplyr", "tidyverse", "tidytext", "ggplot2", "forcats", "igraph", 
+                   "ggraph", "jsonlite", "tm", "parsnip", "tidymodels"))
 library(dplyr)
 library(tidytext)
 library(ggplot2)
@@ -80,7 +80,7 @@ dataset_20p_bi_bigrams <- dataset_20p_bi_tf_idf %>%
 
 ```{r Getting the data for modeling}
 
-modeling_dataset_20p <- dataset_20p %>%
+modeling_dataset_20p <- sample_frac(dataset_20p, .20) %>%
   mutate(id = row_number())
 
 modeling_dataset_20p_bi <- modeling_dataset_20p %>%
@@ -98,10 +98,12 @@ modeling_dataset_20p_bi_count <- modeling_dataset_20p_bi %>%
 modeling_dataset_20p_bi_m <- modeling_dataset_20p_bi_count %>%
   cast_sparse(row = id, bigram, n)
 
-
-
+modeling_dataset_20p_bi_m <- modeling_dataset_20p_bi_count %>%
+  cast_dtm(id, bigram, n)
+  
+  
 #pre-modeling stops here
-dtm_df <- data.frame(as.matrix(modeling_dataset_20p_bi_m)) 
+dtm_df <- data.frame(as.matrix(chapters_dtm)) 
 
 dtm_df <- dtm_df %>%
   mutate(id = row.names(dtm_df))
