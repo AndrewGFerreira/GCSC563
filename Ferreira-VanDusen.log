@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.1.19)  27 JAN 2022 20:01
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021) (preloaded format=pdflatex 2022.1.19)  24 FEB 2022 20:45
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -967,6 +967,26 @@ Overfull \hbox (27.18845pt too wide) has occurred while \output is active
 [3
 
 ]
+Overfull \hbox (27.18845pt too wide) has occurred while \output is active
+ [][][][]  
+ []
+
+[4
+
+]
+<histogram.png, id=198, 519.44063pt x 318.69063pt>
+File: histogram.png Graphic file (type png)
+<use histogram.png>
+Package pdftex.def Info: histogram.png  used on input line 66.
+(pdftex.def)             Requested size: 155.83339pt x 95.60791pt.
+
+Overfull \hbox (27.18845pt too wide) has occurred while \output is active
+ [][][][]  
+ []
+
+[5
+
+ <./histogram.png>]
 \tf@nav=\write6
 \openout6 = `Ferreira-VanDusen.nav'.
 
@@ -981,20 +1001,21 @@ Package rerunfilecheck Info: File `Ferreira-VanDusen.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 20527 strings out of 478994
- 383645 string characters out of 5858184
- 678819 words of memory out of 5000000
- 37581 multiletter control sequences out of 15000+600000
- 405242 words of font info for 33 fonts, out of 8000000 for 9000
+ 20593 strings out of 478994
+ 385064 string characters out of 5858184
+ 679920 words of memory out of 5000000
+ 37641 multiletter control sequences out of 15000+600000
+ 405536 words of font info for 34 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 131i,15n,132p,443b,562s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 131i,15n,132p,443b,564s stack positions out of 5000i,500n,10000p,200000b,80000s
 </usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmss10.pfb
 ></usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmss12.pfb>
-</usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmss8.pfb>
-Output written on Ferreira-VanDusen.pdf (3 pages, 52751 bytes).
+</usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmss8.pfb></
+usr/local/texlive/2021/texmf-dist/fonts/type1/public/amsfonts/cm/cmssbx10.pfb>
+Output written on Ferreira-VanDusen.pdf (5 pages, 102446 bytes).
 PDF statistics:
- 183 PDF objects out of 1000 (max. 8388607)
- 130 compressed objects within 2 object streams
- 7 named destinations out of 1000 (max. 500000)
- 259 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 244 PDF objects out of 1000 (max. 8388607)
+ 185 compressed objects within 2 object streams
+ 11 named destinations out of 1000 (max. 500000)
+ 270 words of extra memory for PDF output out of 10000 (max. 10000000)
 
